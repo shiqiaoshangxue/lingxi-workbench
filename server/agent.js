@@ -801,7 +801,7 @@ async function callLLMChat(cfg, messages, tools) {
   if (!base) throw new Error("未配置 LLM Base URL");
   const url = base + "/chat/completions";
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 25000);
+  const timer = setTimeout(() => ac.abort(), 60000);
   try {
     const resp = await fetch(url, {
       method: "POST",
