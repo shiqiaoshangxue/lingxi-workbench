@@ -1,0 +1,15 @@
+# 灵犀工作台 · docker-compose 一键部署
+# 使用：docker compose up -d  →  http://localhost:3000
+# 数据持久化在 ./data 目录（db.json + 上传文件）
+services:
+  lingxi:
+    build: .
+    container_name: lingxi-workbench
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/server/data
+    environment:
+      - PORT=3000
+      - TZ=Asia/Shanghai

@@ -1,0 +1,16 @@
+# ===== 运行数据与密钥（绝不提交）=====
+# 用户数据（db.json 等）
+server/data/
+# JWT 签名密钥
+server/secret.key
+
+# ===== 临时/测试产物 =====
+# 截图调试目录
+_shots/
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# ===== 本地环境 =====
+.env
