@@ -612,6 +612,13 @@ on("POST", "/api/agent/chat", async (req, res, body, user) => {
   if (!text) return fail(res, 400, "请输入内容");
   const sessionId = String((body || {}).sessionId || "").slice(0, 64);
   const requestId = String((body || {}).requestId || "").slice(0, 64);
+  const cfg = (db.agentConfig && db.agentConfig.llm) || {};
+  if (cfg.enabled && cfg.apiKey) {
+    try {
+      const llmRes = await Agent.llmChat(user, sessionId, text, requestId, notify);
+      if (llmRes) return ok(res, llmRes);
+    } catch (e) { /* 降级到确定性引擎 */ }
+  }
   ok(res, Agent.intentChat(user, sessionId, text, requestId));
 });
 

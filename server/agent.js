@@ -1,6 +1,6 @@
 /* ============================================================
    灵犀工作台 · Agent 引擎
-   三层架构：确定性技能库 + cron 规则引擎 + 工具注册表（LLM 预留）
+   三层架构：确定性技能库 + cron 规则引擎 + 工具注册表（LLM function-calling 已接入）
    零外部依赖。技能只读或发通知，不直接改业务数据（安全默认）。
    ============================================================ */
 "use strict";
@@ -531,7 +531,7 @@ function getSession(userId, sessionId) {
   const key = sessionId || String(userId);
   let s = sessions.get(key);
   if (!s || Date.now() - s.updatedAt > SESSION_TTL) {
-    s = { key, userId, state: "idle", lastIntent: null, pendingParams: [], collected: {}, askedCount: {}, context: [], updatedAt: Date.now() };
+    s = { key, userId, state: "idle", lastIntent: null, pendingParams: [], collected: {}, askedCount: {}, context: [], llmHistory: [], updatedAt: Date.now() };
     sessions.set(key, s);
   }
   s.updatedAt = Date.now();
@@ -771,6 +771,150 @@ function executeIntent(user, session, def, params, reply, source) {
   return reply({ reply: "该意图暂不支持。", handoff: { question: "unknown" } });
 }
 
+/* ---------- LLM function-calling 路径（自然语言操作） ---------- */
+const LLM_PROVIDER_DEFAULTS = { deepseek: "https://api.deepseek.com/v1", openai: "https://api.openai.com/v1", custom: "" };
+let llmCallDate = "";
+let llmCallCount = 0;
+function llmCallsToday() {
+  const d = DB.dayStr();
+  if (llmCallDate !== d) { llmCallDate = d; llmCallCount = 0; }
+  return llmCallCount;
+}
+
+function buildToolSchema() {
+  return TOOLS.map((t) => ({
+    type: "function",
+    function: {
+      name: t.name,
+      description: t.desc,
+      parameters: {
+        type: "object",
+        properties: Object.fromEntries(t.params.map((p) => [p.name, { type: "string", description: p.desc }])),
+        required: t.params.filter((p) => p.required).map((p) => p.name),
+      },
+    },
+  }));
+}
+
+async function callLLMChat(cfg, messages, tools) {
+  const base = (cfg.baseUrl || LLM_PROVIDER_DEFAULTS[cfg.provider] || "").replace(/\/+$/, "");
+  if (!base) throw new Error("未配置 LLM Base URL");
+  const url = base + "/chat/completions";
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 25000);
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.apiKey },
+      body: JSON.stringify({ model: cfg.model || "deepseek-chat", messages, tools, tool_choice: "auto", temperature: 0.2 }),
+      signal: ac.signal,
+    });
+    if (!resp.ok) throw new Error("LLM HTTP " + resp.status);
+    const data = await resp.json();
+    return data.choices && data.choices[0] && data.choices[0].message;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/*
+ * 自然语言操作入口。返回 null 表示应降级到确定性 intentChat。
+ * - read/safe 级工具直接执行
+ * - write 级工具只生成前端确认动作（点击后才生效，安全不变）
+ */
+async function llmChat(user, sessionId, text, requestId, notify) {
+  const cfg = (db.agentConfig && db.agentConfig.llm) || {};
+  if (!cfg.enabled || !cfg.apiKey) return null;
+  const controls = getControls();
+  if (controls.llmMaxCallsPerDay && llmCallsToday() >= controls.llmMaxCallsPerDay) return null;
+  llmCallCount++;
+
+  const cols = (db.columns || []).map((c) => ({ id: c.id, name: c.name }));
+  const projs = db.projects.map((p) => ({ id: p.id, name: p.name }));
+  const tasks = DB.visibleTasks(user).filter((t) => t.colId !== "col_done").slice(0, 80)
+    .map((t) => ({ id: t.id, title: t.title, projectId: t.projectId, dueDate: t.dueDate }));
+  const users = (db.users || []).map((u) => ({ id: u.id, name: u.name, role: u.role })).slice(0, 50);
+
+  const systemPrompt =
+    "你是「灵犀工作台」的内置智能助手，帮助用户用自然语言操作项目管理工作台。你可以通过调用工具来完成任务。规则：\n" +
+    "1) read/safe 级工具（list_overdue_tasks、send_notification）可直接调用执行；\n" +
+    "2) write 级工具（create_task、move_task、update_task）你只需生成调用参数，不要猜测执行结果，系统会生成确认按钮由用户点击后才生效；\n" +
+    "3) 严格基于下面提供的真实数据，不要编造任务/项目/用户，参数里的 id 必须来自上下文；\n" +
+    "4) 状态列 id：完成用 'col_done'，开始/进行中用第一个列 id；\n" +
+    "5) 用简体中文回复，简洁友好。\n" +
+    "当前用户：id=" + user.id + "，角色=" + user.role + "。\n" +
+    "状态列：" + JSON.stringify(cols) + "\n" +
+    "项目：" + JSON.stringify(projs) + "\n" +
+    "未完成任务（最多80）：" + JSON.stringify(tasks) + "\n" +
+    "用户列表：" + JSON.stringify(users);
+
+  const session = getSession(user.id, sessionId);
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...(session.llmHistory || []).slice(-10),
+    { role: "user", content: text },
+  ];
+
+  const tools = buildToolSchema();
+  let msg;
+  try {
+    msg = await callLLMChat(cfg, messages, tools);
+  } catch (e) {
+    return null; // 降级到确定性引擎
+  }
+  if (!msg) return null;
+
+  // 无工具调用：直接问答
+  if (!msg.tool_calls || !msg.tool_calls.length) {
+    const reply = (msg.content || "").trim() || "（暂无回复）";
+    session.llmHistory = (session.llmHistory || []).concat([{ role: "user", content: text }, { role: "assistant", content: reply }]).slice(-20);
+    return { reply, actions: [], source: { llm: true } };
+  }
+
+  // 有工具调用：read/safe 执行，write 转确认动作
+  const executed = [];
+  const actions = [];
+  for (const tc of msg.tool_calls) {
+    const fn = tc.function || {};
+    const tool = findTool(fn.name);
+    if (!tool) continue;
+    let args = {};
+    try { args = JSON.parse(fn.arguments || "{}"); } catch (e) { args = {}; }
+    if (tool.level === "write") {
+      const label = (tool.name === "create_task" && args.title ? "创建任务「" + args.title + "」" : tool.desc || tool.name) + (args.dueDate ? "（截止 " + args.dueDate + "）" : "");
+      actions.push({ label, tool: tool.name, args, level: "write", intent: null });
+    } else {
+      try {
+        const r = tool.run({ user, notify: notify || (() => {}) }, args);
+        executed.push({ toolCallId: tc.id, name: tool.name, ok: !(r && r.ok === false), result: r });
+      } catch (e) {
+        executed.push({ toolCallId: tc.id, name: tool.name, ok: false, error: e.message });
+      }
+    }
+  }
+
+  // 第二次调用：基于执行结果生成自然语言总结
+  let reply = "";
+  const toolMsgs = executed.map((e) => ({ role: "tool", tool_call_id: e.toolCallId, content: JSON.stringify(e.result !== undefined ? e.result : { error: e.error }) }));
+  const followMessages = [
+    ...messages,
+    { role: "assistant", content: msg.content || "", tool_calls: msg.tool_calls },
+    ...toolMsgs,
+    { role: "user", content: "请用简体中文、简洁地告诉我你做了什么，或准备了哪些待确认操作。" },
+  ];
+  try {
+    const m2 = await callLLMChat(cfg, followMessages, tools);
+    reply = (m2 && m2.content ? m2.content : "").trim();
+  } catch (e) { reply = ""; }
+  if (!reply) {
+    reply = actions.length
+      ? "我已准备好以下操作，请确认 👇（点击后才会生效）"
+      : "查询完成，结果如下 👇";
+  }
+  session.llmHistory = (session.llmHistory || []).concat([{ role: "user", content: text }, { role: "assistant", content: reply }]).slice(-20);
+  return { reply, actions, source: { llm: true, toolCalls: msg.tool_calls.map((x) => (x.function || {}).name) } };
+}
+
 /* ---------- 执行统计聚合（M7） ---------- */
 function stats() {
   const logs = db.agentLogs || [];
@@ -806,5 +950,5 @@ function clearSession(userId, sessionId) {
 }
 
 module.exports = { TOOLS, findTool, SKILLS, findSkill, runSkill, startScheduler, cronMatch, chatReply, FAQ,
-  INTENT_DEFS, recognizeIntent, intentChat, getSession, getControls, setControls, auditReport, stats, runsToday,
+  INTENT_DEFS, recognizeIntent, intentChat, llmChat, getSession, getControls, setControls, auditReport, stats, runsToday,
   clearLogs, clearSession };
