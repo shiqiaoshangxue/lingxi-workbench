@@ -781,6 +781,16 @@ function llmCallsToday() {
   return llmCallCount;
 }
 
+/* 当前日期中文描述，注入 system prompt，让模型能自行换算相对日期（明天/周五/下周一） */
+function todayDesc() {
+  const d = new Date();
+  const wd = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][d.getDay()];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + day + "（" + wd + "）";
+}
+
 function buildToolSchema() {
   return TOOLS.map((t) => ({
     type: "function",
@@ -836,12 +846,14 @@ async function llmChat(user, sessionId, text, requestId, notify) {
   const users = (db.users || []).map((u) => ({ id: u.id, name: u.name, role: u.role })).slice(0, 50);
 
   const systemPrompt =
-    "你是「灵犀工作台」的内置智能助手，帮助用户用自然语言操作项目管理工作台。你可以通过调用工具来完成任务。规则：\n" +
+    "你是「灵犀工作台」的内置智能助手，帮助用户用自然语言操作项目管理工作台。你可以通过调用工具来完成任务。\n" +
+    "当前日期：" + todayDesc() + "。涉及相对日期（今天/明天/后天/周X/下周一/月底等）必须据此换算为绝对日期 YYYY-MM-DD，不要反问用户「今天是几号」。\n" +
+    "规则：\n" +
     "1) read/safe 级工具（list_overdue_tasks、send_notification）可直接调用执行；\n" +
-    "2) write 级工具（create_task、move_task、update_task）你只需生成调用参数，不要猜测执行结果，系统会生成确认按钮由用户点击后才生效；\n" +
+    "2) write 级工具（create_task、move_task、update_task）你必须直接调用对应工具并给出参数，不要仅在文字里描述「请确认/我会帮你建」，也不要反问用户是否要创建——系统会自动生成确认按钮，用户点击后才生效；\n" +
     "3) 严格基于下面提供的真实数据，不要编造任务/项目/用户，参数里的 id 必须来自上下文；\n" +
     "4) 状态列 id：完成用 'col_done'，开始/进行中用第一个列 id；\n" +
-    "5) 用简体中文回复，简洁友好。\n" +
+    "5) 用简体中文回复，简洁友好；执行写操作时直接 emit 工具调用，不要只用文字回应。\n" +
     "当前用户：id=" + user.id + "，角色=" + user.role + "。\n" +
     "状态列：" + JSON.stringify(cols) + "\n" +
     "项目：" + JSON.stringify(projs) + "\n" +
@@ -864,6 +876,21 @@ async function llmChat(user, sessionId, text, requestId, notify) {
   }
   if (!msg) return null;
 
+  // 无工具调用：若原文明显是操作意图（建/完成/移动/改…），强指令重试一次，避免模型只用文字描述而不 emit 工具
+  if (!msg.tool_calls || !msg.tool_calls.length) {
+    const OP_WORDS = ["创建", "建", "新建", "完成", "开始", "做", "移动", "挪", "改", "更新", "修改", "设为", "标记", "删除", "移除", "指派"];
+    const looksLikeOp = OP_WORDS.some((w) => text.indexOf(w) >= 0);
+    if (looksLikeOp) {
+      try {
+        const retryMsg = await callLLMChat(cfg, [
+          ...messages,
+          { role: "assistant", content: msg.content || "" },
+          { role: "user", content: "你刚才没有调用任何工具。请立即根据我的原始请求调用对应的写操作工具（create_task / move_task / update_task），不要再用文字描述或反问。今天是 " + todayDesc() + "，相对日期请直接换算为 YYYY-MM-DD。" }
+        ], tools);
+        if (retryMsg && retryMsg.tool_calls && retryMsg.tool_calls.length) msg = retryMsg;
+      } catch (e) { /* 忽略重试错误，走下方降级 */ }
+    }
+  }
   // 无工具调用：直接问答
   if (!msg.tool_calls || !msg.tool_calls.length) {
     const reply = (msg.content || "").trim() || "（暂无回复）";
