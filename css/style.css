@@ -890,7 +890,7 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.35; }
 
 /* 行操作按钮 */
 .row-actions { display: none; gap: 2px; }
-.list-item:hover .row-actions, .note-card:hover .row-actions, .goal-card:hover .row-actions { display: flex; }
+.list-item:hover .row-actions, .note-card:hover .row-actions, .goal-card:hover .row-actions, .card.card-hover .row-actions { display: flex; }
 .row-btn {
   width: 28px; height: 28px;
   border-radius: 7px;

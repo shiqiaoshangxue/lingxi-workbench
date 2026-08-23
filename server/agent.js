@@ -27,7 +27,7 @@ const TOOLS = [
     params: [{ name: "title", required: true, desc: "标题" }, { name: "projectId", required: false, desc: "项目" }, { name: "dueDate", required: false, desc: "截止 YYYY-MM-DD" }, { name: "priority", required: false, desc: "high/mid/low" }],
     run: (ctx, args) => {
       if (!args.title) return { ok: false, error: "缺少标题" };
-      if (args.projectId && !DB.canWriteProject(ctx.user, args.projectId)) return { ok: false, error: "无权限" };
+      if (args.projectId && !DB.canWriteProject(ctx.user, args.projectId)) args = Object.assign({}, args, { projectId: null }); // 无该项目写权限时降级为未分配任务，保证创建成功
       const t = { id: DB.uid("t_"), title: String(args.title).slice(0, 200), desc: "", projectId: args.projectId || null,
         colId: db.columns[0].id, priority: ["high", "mid", "low"].includes(args.priority) ? args.priority : "mid",
         dueDate: args.dueDate || "", startDate: "", tags: [], subtasks: [], assigneeId: null,
@@ -840,7 +840,7 @@ async function llmChat(user, sessionId, text, requestId, notify) {
   llmCallCount++;
 
   const cols = (db.columns || []).map((c) => ({ id: c.id, name: c.name }));
-  const projs = db.projects.map((p) => ({ id: p.id, name: p.name }));
+  const projs = db.projects.map((p) => ({ id: p.id, name: p.name, writable: DB.canWriteProject(user, p.id) }));
   const tasks = DB.visibleTasks(user).filter((t) => t.colId !== "col_done").slice(0, 80)
     .map((t) => ({ id: t.id, title: t.title, projectId: t.projectId, dueDate: t.dueDate }));
   const users = (db.users || []).map((u) => ({ id: u.id, name: u.name, role: u.role })).slice(0, 50);
@@ -851,7 +851,7 @@ async function llmChat(user, sessionId, text, requestId, notify) {
     "规则：\n" +
     "1) read/safe 级工具（list_overdue_tasks、send_notification）可直接调用执行；\n" +
     "2) write 级工具（create_task、move_task、update_task）你必须直接调用对应工具并给出参数，不要仅在文字里描述「请确认/我会帮你建」，也不要反问用户是否要创建——系统会自动生成确认按钮，用户点击后才生效；\n" +
-    "3) 严格基于下面提供的真实数据，不要编造任务/项目/用户，参数里的 id 必须来自上下文；\n" +
+    "3) 严格基于下面提供的真实数据，不要编造任务/项目/用户，参数里的 id 必须来自上下文；创建任务时 projectId 只能使用 writable=true 的项目，若没有 writable 项目则不传 projectId（任务将创建为未分配）；\n" +
     "4) 状态列 id：完成用 'col_done'，开始/进行中用第一个列 id；\n" +
     "5) 用简体中文回复，简洁友好；执行写操作时直接 emit 工具调用，不要只用文字回应。\n" +
     "当前用户：id=" + user.id + "，角色=" + user.role + "。\n" +

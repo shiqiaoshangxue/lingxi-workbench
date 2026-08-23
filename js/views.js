@@ -321,6 +321,7 @@ const projectsView = {
     const projects = S.projects.filter((p) => p.status !== "archived");
     const archived = S.projects.filter((p) => p.status === "archived");
     const cards = (list) => list.map((p) => {
+      const canDel = S.isAdmin || !!(S.user && S.members && S.members.some((m) => m.projectId === p.id && m.userId === S.user.id && m.role === "owner"));
       const tasks = S.tasks.filter((t) => t.projectId === p.id);
       const done = tasks.filter((t) => t.colId === "col_done").length;
       const prog = App.Stats.projectProgress(p.id);
@@ -334,7 +335,7 @@ const projectsView = {
           </div>
           <div class="row-actions">
             <button class="row-btn" data-edit>${App.ICONS.edit}</button>
-            <button class="row-btn danger" data-del>${App.ICONS.trash}</button>
+            ${canDel ? `<button class="row-btn danger" data-del>${App.ICONS.trash}</button>` : ""}
           </div>
         </div>
         <div class="small muted" style="min-height:38px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${App.escapeHtml(p.desc || "暂无描述")}</div>
@@ -373,12 +374,17 @@ const projectsView = {
     el.querySelectorAll("[data-proj]").forEach((card) => {
       const p = App.DB.state.projects.find((x) => x.id === card.dataset.proj);
       card.querySelector("[data-edit]").addEventListener("click", (e) => { e.stopPropagation(); openProjectModal(p); });
-      card.querySelector("[data-del]").addEventListener("click", async (e) => {
+      const delBtn = card.querySelector("[data-del]");
+      if (delBtn) delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const ok = await App.UI.confirm({ title: "删除项目", text: `确定删除「${p.name}」吗？项目下的任务、评论、文件将全部删除。`, okText: "删除", danger: true });
         if (!ok) return;
-        await App.DB.deleteProject(p.id);
-        App.UI.toast("项目已删除"); App.render();
+        try {
+          await App.DB.deleteProject(p.id);
+          App.UI.toast("项目已删除"); App.render();
+        } catch (err) {
+          App.UI.toast(err.message || "删除失败", "error");
+        }
       });
       card.addEventListener("click", (e) => {
         if (e.target.closest(".row-actions")) return;
