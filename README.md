@@ -189,6 +189,17 @@ node server/server.js
   - 任何网络错误 / 超时 / 未配置都会**自动降级**回确定性模式（基于真实数据，无幻觉）
   - 配置项含「每日调用上限」，超量自动停用 LLM 路径
 
+**DeepSeek 配置示例**（最容易填错的两处）：
+
+| 配置项 | 正确值 | 常见错误 |
+| --- | --- | --- |
+| Provider | `deepseek` 或 `custom` | — |
+| Base URL | `https://api.deepseek.com/v1` | 误填 `…/anthropic`（DeepSeek 无此路径，会导致每次 404 降级） |
+| 模型名 | `deepseek-v4-flash`（或 `deepseek-v4-pro`） | 误带日期后缀如 `DeepSeek-V4-Flash-0731`（服务端不识别） |
+| API Key | 以 `sk-` 开头的 DeepSeek 密钥 | — |
+
+> 若填入后 Agent 仍"听不懂人话"，先排查：① Base URL 是否含 `/v1`；② 模型名是否被正确识别；③ 网络是否可达。DeepSeek V4 带推理（reasoning），首响常需 20–30 秒，本系统已预留 60 秒超时，请勿误判为卡死。
+
 ---
 
 ## 部署
