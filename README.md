@@ -68,31 +68,55 @@ node server/server.js
 
 ---
 
-## 功能一览
+## 功能详解
 
-| 模块 | 说明 |
-| ---- | ---- |
-| 🏠 我的工作台 | 今日任务、进行中、本周专注、目标进度、最近笔记的总览 |
-| 📁 项目 | 项目卡片、进度、成员管理（负责人 / 可编辑 / 只读）、归档 |
-| ✅ 任务 | 列表 / 表格双视图、子任务、标签、起止日期、负责人、评论、前置依赖、归属里程碑 |
-| 🗂 看板 | 拖拽流转、可自定义列 |
-| ⏱ 时间追踪 | 任务计时器、周专注趋势、时间日志 |
-| 🎯 目标 | OKR 风格，KR 进度滑块 |
-| 📚 知识库 | Markdown 笔记、分类、置顶 |
-| 📊 甘特图 | 月刻度 + 任务条 + 里程碑 + 今天线 |
-| 📅 日历 | 月历 + 日程 + 任务到期标记 |
-| 🚩 里程碑 | 任务组模型，关联任务自动汇总进度 + 时间线 |
-| 📈 报告中心 | 工时趋势 + 项目 / 成员工时 / 客户报表 + CSV 导出 |
-| 🔁 回顾 | KPT / 好评-改进-行动 复盘模板 |
-| 💡 想法 | 团队投票 + 状态流转 |
-| 🏢 客户 | 联系人 / 组织 / 关联项目 |
-| 🧩 画布 | 7 种模板：SWOT / 精益 / 商业模式 / 价值主张 / 客户旅程 / 移情图 / 精益创业 |
-| 📁 文件库 | 上传 / 下载（50MB 上限） |
-| 🔔 通知 | 任务分配 / 评论 / 项目邀请 / 全部已读 |
-| 🤖 Agent 助手 | 技能库 + 自动化规则 + 自然语言对话（可接 LLM） |
-| ⚙ 设置 | 昵称 / 邮箱 · 主题 · JSON / CSV 导入导出 · SMTP 邮件 · 示例数据 |
+下表按界面左侧导航分组列出全部 19 个模块。**入口路径**为直接在地址后追加的 URL 参数（如 `http://localhost:3000/?v=gantt`），可一键直达对应视图；**代码位置**指向实现该视图的前端文件。
 
-> 右下角紫色渐变悬浮按钮是 Agent 快捷入口，点击即唤起。
+### 工作区
+
+| 模块 | 入口路径 | 代码位置 | 详细描述 |
+| ---- | -------- | -------- | -------- |
+| 🏠 我的工作台 | `?v=dashboard` | `js/views.js` | 个人总览页。展示今日任务（到期 / 逾期 / 进行中）、本周专注时长、目标进度概览、最近笔记与项目动态，打开即知「今天该干嘛」。 |
+| 📁 项目 | `?v=projects` | `js/views.js` | 项目管理主页。项目卡片网格，含进度条、状态（进行中 / 已归档）、颜色标签；可新建 / 编辑 / 归档项目，进入项目详情邀请成员并设置角色（负责人 / 可编辑 / 只读）。 |
+| ✅ 任务 | `?v=tasks` | `js/views.js` | 任务中心。列表视图与表格视图（表格支持批量编辑）双模式；字段含标题、所属项目、看板列、负责人、优先级（高 / 中 / 低）、标签、开始 / 截止日期、子任务、前置依赖、归属里程碑、描述；支持筛选与搜索。 |
+| 🗂 看板 | `?v=kanban` | `js/views.js` | 可视化流转。拖拽任务卡片改变状态；看板列可自定义（新增 / 重命名 / 删除 / 清空）；卡片显示优先级与负责人。 |
+
+### 规划
+
+| 模块 | 入口路径 | 代码位置 | 详细描述 |
+| ---- | -------- | -------- | -------- |
+| 📊 甘特图 | `?v=gantt` | `js/views-extra.js` | 时间排期。月刻度时间轴，按任务起止日期渲染任务条，叠加里程碑菱形标记与「今天」参考线，直观呈现任务并行与延期。 |
+| 📅 日历 | `?v=calendar` | `js/views-extra.js` | 月历视图。展示日程（events）与任务截止日期，点击日期查看当天安排。 |
+| 🚩 里程碑 | `?v=milestones` | `js/views-extra.js` | 阶段目标。里程碑以「任务组」模型组织，关联任务完成后自动汇总进度；时间线展示各里程碑节点。 |
+| 📈 报告中心 | `?v=reports` | `js/views-extra.js` | 数据统计。30 天工时趋势、按项目 / 成员 / 客户的工时报表，支持 CSV 导出。 |
+| 💡 想法 | `?v=ideas` | `js/views-extra.js` | 创意收集。团队成员提交想法并投票；状态流转（新想法 → 评估中 → 已采纳 → 已关闭）；可关联项目。 |
+
+### 资源
+
+| 模块 | 入口路径 | 代码位置 | 详细描述 |
+| ---- | -------- | -------- | -------- |
+| 🏢 客户 | `?v=clients` | `js/views-extra.js` | 客户管理。维护联系人 / 组织，关联到具体项目；支持个人客户（无项目）与项目客户。 |
+| 🧩 画布 | `?v=canvas` | `js/views-extra.js` | 结构化思考。7 种模板：SWOT、精益画布、商业模式画布、价值主张画布、客户旅程地图、移情图、精益创业画布；每个单元格可编辑并保存。 |
+| 🔁 回顾 | `?v=retros` | `js/views-extra.js` | 团队复盘。提供 KPT（保持 / 问题 / 尝试）与「好评-改进-行动」两种模板，记录并沉淀改进项。 |
+| 📁 文件库 | `?v=files` | `js/views-extra.js` | 文件管理。上传 / 下载文件（单文件 ≤ 50MB，以 base64 存入 JSON），可按项目归类。 |
+| 📚 知识库 | `?v=notes` | `js/views.js` | 笔记。Markdown 笔记，支持分类、置顶、编辑，用于个人知识沉淀。 |
+
+### 专注
+
+| 模块 | 入口路径 | 代码位置 | 详细描述 |
+| ---- | -------- | -------- | -------- |
+| ⏱ 时间追踪 | `?v=timetrack` | `js/views.js` | 工时记录。任务计时器（开始 / 暂停 / 结束），按日 / 周统计专注时长，展示周趋势与时间日志列表。 |
+| 🎯 目标 | `?v=goals` | `js/views.js` | 目标管理。OKR 风格，目标下挂 KR（关键结果），KR 带进度滑块，跟踪目标达成度。 |
+
+### 系统
+
+| 模块 | 入口路径 | 代码位置 | 详细描述 |
+| ---- | -------- | -------- | -------- |
+| 🔔 通知 | `?v=notifications` | `js/views-extra.js` | 消息中心。接收任务分配、评论、项目邀请等通知；支持单条已读与全部已读，导航栏显示未读角标。 |
+| 🤖 Agent 助手 | `?v=agent` | `js/views-agent.js` | 见下方「内置 Agent 助手」章节。技能库 + 自动化规则 + 自然语言对话 + 悬浮窗。 |
+| ⚙ 设置 | `?v=settings` | `js/views.js` | 个人与系统设置。修改昵称 / 邮箱、切换深色 / 浅色主题、JSON / CSV 导入导出、配置 SMTP 邮件（用于任务分配通知）、重置或生成示例数据。 |
+
+> 右下角紫色渐变悬浮按钮是 Agent 快捷入口，点击即唤起对话窗。
 
 ---
 
@@ -190,6 +214,96 @@ workbench/
 ├── LICENSE                 # AGPL-3.0
 └── README.md
 ```
+
+---
+
+## REST API 一览
+
+所有接口以 `/api/` 为前缀，除登录与注册外均需请求头 `Authorization: Bearer <token>`。以下为后端实际提供的全部端点（`:id` 为资源主键，`:userId` 为用户主键）。
+
+### 认证与引导
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| POST | `/api/auth/register` | 注册账号（首个注册者自动成为系统管理员） |
+| POST | `/api/auth/login` | 登录获取 Token |
+| GET | `/api/me` | 获取当前用户信息 |
+| POST | `/api/profile` | 修改昵称 / 邮箱 |
+| GET | `/api/bootstrap` | 一次性拉取当前用户可见的全部数据 |
+| POST | `/api/import` | 导入个人数据（JSON） |
+
+### 项目与成员
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| GET / POST | `/api/projects` | 项目列表 / 新建项目 |
+| PUT / DELETE | `/api/projects/:id` | 更新 / 删除项目（删除级联任务、成员等） |
+| GET / POST | `/api/projects/:id/members` | 成员列表 / 邀请成员 |
+| DELETE | `/api/projects/:id/members/:userId` | 移除成员 |
+
+### 任务 / 看板 / 时间
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| GET / POST | `/api/columns` | 看板列列表 / 新建列 |
+| PUT / DELETE | `/api/columns/:id` | 更新 / 删除列 |
+| GET / POST | `/api/tasks` | 任务列表 / 新建任务 |
+| PUT / DELETE | `/api/tasks/:id` | 更新 / 删除任务 |
+| GET / POST | `/api/timeLogs` | 工时日志列表 / 记录工时 |
+| DELETE | `/api/timeLogs/:id` | 删除工时记录 |
+
+### 项目资源（客户 / 想法 / 里程碑 / 日程 / 画布）
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| GET / POST | `/api/clients` `/api/ideas` `/api/milestones` `/api/events` | 各资源列表 / 新建 |
+| PUT / DELETE | `/api/clients/:id` 等 | 按 id 更新 / 删除 |
+| POST / PUT / DELETE | `/api/canvas` `/api/canvas/:id` | 画布（含 7 种模板类型）增改删 |
+| POST | `/api/ideas/:id/vote` | 对想法投票 |
+
+### 评论 / 文件 / 通知
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| GET / POST | `/api/tasks/:id/comments` | 任务评论列表 / 发表评论 |
+| DELETE | `/api/comments/:id` | 删除评论 |
+| GET / POST | `/api/files` | 文件列表 / 上传（base64） |
+| DELETE | `/api/files/:id` | 删除文件 |
+| GET | `/api/files/:id/download` | 下载文件 |
+| GET | `/api/notifications` | 通知列表 |
+| POST | `/api/notifications/:id/read` | 标记单条已读 |
+| POST | `/api/notifications/read-all` | 全部已读 |
+
+### Agent 助手
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| GET | `/api/agent/bootstrap` | 技能 / 规则 / 日志 / LLM 配置 |
+| POST | `/api/agent/run` | 运行某个技能 |
+| POST | `/api/agent/action` | 执行技能给出的建议动作 |
+| POST | `/api/agent/chat` | 自然语言对话 |
+| GET / POST | `/api/agent/rules` | 自动化规则列表 / 新建 |
+| PUT / DELETE | `/api/agent/rules/:id` | 更新 / 删除规则 |
+| GET / DELETE | `/api/agent/logs` | 执行日志（仅管理员可清空） |
+| POST | `/api/agent/session/clear` | 清空当前会话 |
+| GET | `/api/agent/stats` | 执行统计 |
+| GET | `/api/agent/audit` | 安全护栏审计报告 |
+| POST | `/api/agent/controls` | 运维开关（总开关 / 限额 / 熔断） |
+| POST | `/api/agent/config` | 配置 LLM（DeepSeek / OpenAI / 兼容 API） |
+
+### 报告 / 导入导出 / 邮件 / 管理
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| GET | `/api/reports` | 工时 / 项目 / 成员 / 客户聚合报表 |
+| POST | `/api/import-csv` | 导入 CSV（如工时） |
+| GET | `/api/tasks/export.csv` | 导出任务 CSV |
+| GET / POST | `/api/mail/config` | 读取 / 保存 SMTP 配置 |
+| POST | `/api/mail/test` | 发送测试邮件 |
+| GET / POST | `/api/users` | 用户列表 / 新建用户（仅管理员） |
+| POST | `/api/seed` | 生成示例数据（仅管理员） |
+
+> 前后端接口一致性由 `_apicheck.js` 校验：前端调用的每个端点都必须能在后端找到对应路由，避免出现悬空请求。
 
 ---
 
