@@ -68,6 +68,48 @@ node server/server.js
 
 ---
 
+## 界面截图
+
+> 以下均为浅色主题下真实运行界面（仓库内图片位于 `docs/screenshots/`）。
+
+### 我的工作台 · 今日总览
+
+![我的工作台](docs/screenshots/dashboard.png)
+
+### 看板 · 拖拽流转
+
+![看板](docs/screenshots/kanban.png)
+
+### 甘特图 · 时间排期
+
+![甘特图](docs/screenshots/gantt.png)
+
+### 日历 · 月历视图
+
+![日历](docs/screenshots/calendar.png)
+
+### 报告中心 · 数据报表
+
+![报告中心](docs/screenshots/reports.png)
+
+### Agent 助手 · 自然语言对话
+
+![Agent 对话](docs/screenshots/agent-chat.png)
+
+### Agent 助手 · 技能库
+
+![Agent 技能库](docs/screenshots/agent-skills.png)
+
+### Agent 助手 · 安全护栏审计
+
+![Agent 安全审计](docs/screenshots/agent-audit.png)
+
+### 设置 · 数据导入导出与 SMTP
+
+![设置](docs/screenshots/settings.png)
+
+---
+
 ## 功能详解
 
 下表按界面左侧导航分组列出全部 19 个模块。**入口路径**为直接在地址后追加的 URL 参数（如 `http://localhost:3000/?v=gantt`），可一键直达对应视图；**代码位置**指向实现该视图的前端文件。
